@@ -85,6 +85,7 @@
       background:var(--text);color:#fff;border-color:var(--text);
     }
     button.primary:hover{opacity:.92}
+
     .scoreBox{
       display:grid;grid-template-columns: 1fr 1.1fr;gap:12px;align-items:stretch;
     }
@@ -135,6 +136,7 @@
       overflow:hidden;
     }
     .fill{height:100%;width:0%}
+
     .listHead{
       display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
       margin-bottom:10px;
@@ -151,9 +153,6 @@
     .mini{
       color:var(--muted);font-size:12px;line-height:1.45
     }
-    .copyBox{
-      display:flex;gap:8px;align-items:center;flex-wrap:wrap
-    }
     .toast{
       position:fixed;right:16px;bottom:16px;
       background:#111827;color:#fff;padding:10px 12px;border-radius:12px;
@@ -169,6 +168,56 @@
       margin-left:auto;
       display:flex;align-items:center;gap:10px;flex-wrap:wrap;
     }
+
+    /* ===== Mobile-friendly ranking (cards + fold) ===== */
+    .rankMobile{display:none}
+    .rankToggleRow{display:none}
+    @media (max-width: 640px){
+      /* hide table on mobile, show cards */
+      .rankDesktop{display:none}
+      .rankMobile{display:block}
+      .rankToggleRow{display:flex;justify-content:flex-end;margin-top:10px}
+    }
+    .rankCards{
+      display:flex;flex-direction:column;gap:10px;
+    }
+    .rankCard{
+      border:1px solid var(--line);
+      border-radius:14px;
+      background:#fff;
+      padding:12px;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+    .rankTop{
+      display:flex;align-items:center;justify-content:space-between;gap:10px;
+    }
+    .rankTitle{
+      font-size:13px;font-weight:700;line-height:1.35
+    }
+    .rankMeta{
+      display:flex;gap:8px;flex-wrap:wrap;align-items:center;
+      color:var(--muted);font-size:12px
+    }
+    .rankScore{
+      font-weight:800;font-size:18px;line-height:1;
+    }
+    .rankScore span{font-weight:600;font-size:12px;color:var(--muted)}
+    .rankWhy{
+      font-size:12px;line-height:1.5;color:var(--text);
+    }
+    .rankWhy .mini{margin-top:2px}
+    .rankWarn{
+      display:inline-flex;align-items:center;gap:6px;
+      padding:4px 8px;border-radius:999px;border:1px solid var(--line);
+      font-size:12px;width:max-content;
+      background:var(--soft);color:var(--muted)
+    }
+    .rankWarn.isWarn{
+      background:#fffbeb;border-color:#fde68a;color:var(--warn)
+    }
+    .hide{display:none !important}
   </style>
 </head>
 <body>
@@ -277,18 +326,30 @@
       <span class="pill" id="listPill">—</span>
     </div>
 
-    <table class="table">
-      <thead>
-        <tr>
-          <th style="width:72px">順位</th>
-          <th>おすすめ配置</th>
-          <th style="width:120px">スコア</th>
-          <th>理由（要点）</th>
-          <th style="width:90px">注意</th>
-        </tr>
-      </thead>
-      <tbody id="rankBody"></tbody>
-    </table>
+    <!-- Desktop table -->
+    <div class="rankDesktop">
+      <table class="table">
+        <thead>
+          <tr>
+            <th style="width:72px">順位</th>
+            <th>おすすめ配置</th>
+            <th style="width:120px">スコア</th>
+            <th>理由（要点）</th>
+            <th style="width:90px">注意</th>
+          </tr>
+        </thead>
+        <tbody id="rankBody"></tbody>
+      </table>
+    </div>
+
+    <!-- Mobile cards -->
+    <div class="rankMobile">
+      <div class="rankCards" id="rankCards"></div>
+      <div class="rankToggleRow">
+        <button id="btnMore" class="primary">さらに2件を見る</button>
+        <button id="btnLess" class="hide">折りたたむ</button>
+      </div>
+    </div>
   </section>
 </div>
 
@@ -343,9 +404,15 @@ const socialFill = document.getElementById("socialFill");
 const penFill = document.getElementById("penFill");
 
 const rankBody = document.getElementById("rankBody");
+const rankCards = document.getElementById("rankCards");
 const listPill = document.getElementById("listPill");
 
+const btnMore = document.getElementById("btnMore");
+const btnLess = document.getElementById("btnLess");
+
 const toast = document.getElementById("toast");
+
+let mobileExpanded = false;
 
 // Buttons
 document.getElementById("btnExample").addEventListener("click", () => {
@@ -360,7 +427,6 @@ document.getElementById("btnShuffle").addEventListener("click", () => {
   employees = shuffle(structuredClone(baseEmployees));
   sites = shuffle(structuredClone(baseSites));
   hydrateSelects();
-  // なるべく分かりやすい組み合わせを初期表示
   setSelection("sato", "a_bldg", true);
   computeAndRender(true);
   showToast("例データを入れ替えました");
@@ -405,7 +471,6 @@ ${out.warning ? `注意：⚠ ${out.warning}` : ""}
     await navigator.clipboard.writeText(text);
     showToast("コピーしました");
   }catch(e){
-    // フォールバック
     const ta = document.createElement("textarea");
     ta.value = text;
     document.body.appendChild(ta);
@@ -416,6 +481,18 @@ ${out.warning ? `注意：⚠ ${out.warning}` : ""}
   }
 });
 
+// Mobile list toggle
+btnMore.addEventListener("click", () => {
+  mobileExpanded = true;
+  computeAndRender(); // rerender list
+  showToast("さらに表示しました");
+});
+btnLess.addEventListener("click", () => {
+  mobileExpanded = false;
+  computeAndRender(); // rerender list
+  showToast("折りたたみました");
+});
+
 // Select change
 empSel.addEventListener("change", () => computeAndRender());
 siteSel.addEventListener("change", () => computeAndRender());
@@ -424,12 +501,6 @@ siteSel.addEventListener("change", () => computeAndRender());
 function clamp(n, min, max){ return Math.max(min, Math.min(max, n)); }
 function round(n){ return Math.round(n); }
 
-/**
- * techFit / socialFit は「差が小さいほど高い」
- * - techFit: |社員技術 - 現場難易度| が0なら100、差10なら0
- * - socialFit: |社員コミュ - 現場会話必須| が0なら100、差10なら0
- * penalty は「危険な組合せにだけ強めの減点」
- */
 function getResult(emp, site){
   const techFit = clamp(100 - Math.abs(emp.tech - site.techDifficulty) * 10, 0, 100);
   const socialFit = clamp(100 - Math.abs(emp.comm - site.talkRequired) * 10, 0, 100);
@@ -437,29 +508,23 @@ function getResult(emp, site){
   let penalty = 0;
   let warning = "";
 
-  // 典型NG：会話必須が高いのにコミュ低い
   if(site.talkRequired >= 8 && emp.comm <= 3){
     penalty += 25;
     warning = "会話必須度が高い現場に対し、コミュ力が低め。クレーム/手戻りのリスク。";
   }
-  // 技術難易度が高いのに技術が低い
   if(site.techDifficulty >= 8 && emp.tech <= 4){
     penalty += 20;
     warning = warning || "技術難易度が高い現場に対し、技術力が不足気味。安全/品質のリスク。";
   }
-  // 一人作業度が高いのにコミュが極端に高い（調整役の強みが活きにくい）
   if(site.soloWork >= 8 && emp.comm >= 9){
     penalty += 10;
   }
 
-  // ベーススコア（腹落ち優先の重み）
   const base = (techFit * 0.55) + (socialFit * 0.45);
   let score = clamp(round(base - penalty), 0, 100);
 
-  // 理由（3行・テンプレ）
   const reasons = buildReasons(emp, site, techFit, socialFit, penalty);
 
-  // バッジ
   const label = score >= 80 ? "おすすめ（根拠あり）"
               : score >= 60 ? "条件付き（要フォロー）"
               : "注意（配置見直し）";
@@ -476,14 +541,12 @@ function getResult(emp, site){
 function buildReasons(emp, site, techFit, socialFit, penalty){
   const lines = [];
 
-  // 技術理由
   if(emp.tech >= site.techDifficulty){
     lines.push(`技術力（${emp.tech}）が難易度（${site.techDifficulty}）を上回り、手戻りが出にくい。`);
   }else{
     lines.push(`技術難易度（${site.techDifficulty}）に対し技術力（${emp.tech}）が不足気味で、フォローが必要。`);
   }
 
-  // 対人理由
   if(site.talkRequired <= 3){
     lines.push(`会話必須度が低く（${site.talkRequired}）、一人作業で進めやすい。`);
   }else if(emp.comm >= site.talkRequired){
@@ -492,14 +555,12 @@ function buildReasons(emp, site, techFit, socialFit, penalty){
     lines.push(`会話必須度（${site.talkRequired}）に対してコミュ力（${emp.comm}）が不足し、対人ストレスが増えやすい。`);
   }
 
-  // 減点理由（透明化）
   if(penalty > 0){
     lines.push(`ミスマッチ罰（-${penalty}点）：危険条件に該当するため、事前対策が必要。`);
   }else{
     lines.push(`ミスマッチ罰なし：危険条件に該当せず、標準運用で回しやすい。`);
   }
 
-  // 3行固定
   return lines.slice(0,3);
 }
 
@@ -547,15 +608,12 @@ function computeAndRender(forceToast=false){
   const site = getSelectedSite();
   const out = getResult(emp, site);
 
-  // Left mini descriptions
   empMini.textContent = `コミュ力 ${emp.comm}/10 ・ 技術力 ${emp.tech}/10 ｜ ${emp.note}`;
   siteMini.textContent = `対人ストレス ${site.peopleStress}/10 ・ 技術難易度 ${site.techDifficulty}/10 ・ 会話必須度 ${site.talkRequired}/10 ｜ ${site.note}`;
 
-  // Title
   pairTitle.textContent = `${emp.name} × ${site.name}`;
   scoreNum.textContent = String(out.score);
 
-  // Badge
   badge.textContent = out.label;
   badge.classList.remove("ok","warn");
   if(out.score >= 80){
@@ -564,7 +622,6 @@ function computeAndRender(forceToast=false){
     badge.classList.add("warn");
   }
 
-  // Reasons
   reasonLines.innerHTML = "";
   out.reasons.forEach(r=>{
     const li = document.createElement("li");
@@ -572,7 +629,6 @@ function computeAndRender(forceToast=false){
     reasonLines.appendChild(li);
   });
 
-  // Warning
   if(out.warning){
     warnBox.classList.remove("hidden");
     warnText.textContent = out.warning;
@@ -581,7 +637,6 @@ function computeAndRender(forceToast=false){
     warnText.textContent = "";
   }
 
-  // Breakdown bars
   techVal.textContent = `${out.breakdown.techFit}/100`;
   socialVal.textContent = `${out.breakdown.socialFit}/100`;
   penVal.textContent = `-${out.breakdown.penalty}点`;
@@ -589,11 +644,9 @@ function computeAndRender(forceToast=false){
   setFill(techFill, out.breakdown.techFit);
   setFill(socialFill, out.breakdown.socialFit);
 
-  // penalty meter: 0〜40くらいを想定して可視化（大きいほど赤…は色指定を避けるので幅だけ）
   const penPct = clamp((out.breakdown.penalty / 40) * 100, 0, 100);
   setFill(penFill, penPct);
 
-  // Ranking list (top 5 for selected emp)
   renderRankingForEmp(emp);
 
   if(forceToast){
@@ -603,7 +656,6 @@ function computeAndRender(forceToast=false){
 
 function setFill(el, pct){
   el.style.width = `${pct}%`;
-  // 色指定は避ける（要件上、見やすさ優先で無彩色のまま）
   el.style.background = "#111827";
 }
 
@@ -616,6 +668,7 @@ function renderRankingForEmp(emp){
   const top5 = scored.slice(0,5);
   listPill.textContent = `対象：${emp.name}（上位${top5.length}件）`;
 
+  // Desktop table
   rankBody.innerHTML = "";
   top5.forEach((x, idx)=>{
     const tr = document.createElement("tr");
@@ -642,9 +695,47 @@ function renderRankingForEmp(emp){
 
     rankBody.appendChild(tr);
   });
+
+  // Mobile cards (fold: show 3 or 5)
+  const visibleCount = mobileExpanded ? 5 : 3;
+  const showMore = !mobileExpanded;
+  const showLess = mobileExpanded;
+
+  rankCards.innerHTML = "";
+  top5.slice(0, visibleCount).forEach((x, idx)=>{
+    const card = document.createElement("div");
+    card.className = "rankCard";
+
+    const warn = !!x.out.warning;
+    const shortWhy = x.out.reasons.join(" / ");
+
+    card.innerHTML = `
+      <div class="rankTop">
+        <div class="rankTitle">#${idx+1}　${emp.name} → ${x.site.name}</div>
+        <div class="rankScore">${x.out.score}<span>/100</span></div>
+      </div>
+      <div class="rankMeta">
+        <span>会話必須:${x.site.talkRequired}/10</span>
+        <span>難易度:${x.site.techDifficulty}/10</span>
+      </div>
+      <div class="rankWhy">
+        ${escapeHtml(shortWhy)}
+      </div>
+      <div class="rankWarn ${warn ? "isWarn" : ""}">
+        ${warn ? "⚠ 注意あり" : "注意なし"}
+      </div>
+    `;
+    rankCards.appendChild(card);
+  });
+
+  // Toggle buttons (only meaningful on mobile; CSS handles visibility)
+  btnMore.classList.toggle("hide", !showMore);
+  btnLess.classList.toggle("hide", !showLess);
+
+  // ボタン文言：常に「さらに2件」になるように固定（top5前提）
+  if(showMore) btnMore.textContent = "さらに2件を見る";
 }
 
-// -------------------- Utils --------------------
 function shuffle(arr){
   for(let i=arr.length-1;i>0;i--){
     const j = Math.floor(Math.random()*(i+1));
@@ -670,7 +761,6 @@ function escapeHtml(str){
 
 // -------------------- Init --------------------
 hydrateSelects();
-// 初期：佐藤 × Aビル（「95点」の腹落ちを最短で見せる）
 setSelection("sato", "a_bldg", true);
 computeAndRender();
 </script>
