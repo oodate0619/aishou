@@ -1,0 +1,678 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Demo3｜相性スコア診断（配置の根拠を透明化）</title>
+  <style>
+    :root{
+      --bg:#ffffff;
+      --card:#ffffff;
+      --text:#111827;
+      --muted:#6b7280;
+      --line:#e5e7eb;
+      --soft:#f9fafb;
+      --accent:#111827;
+      --warn:#b45309;
+      --ok:#065f46;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans JP", "Hiragino Kaku Gothic ProN", Meiryo, Arial, sans-serif;
+      background:var(--bg);
+      color:var(--text);
+    }
+    .wrap{max-width:1100px;margin:0 auto;padding:20px}
+    header{
+      display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;
+      gap:12px;margin-bottom:14px
+    }
+    h1{font-size:20px;margin:0;letter-spacing:.2px}
+    .sub{color:var(--muted);font-size:13px;line-height:1.5;margin-top:6px}
+    .pill{
+      display:inline-flex;align-items:center;gap:8px;
+      border:1px solid var(--line);background:var(--soft);
+      padding:6px 10px;border-radius:999px;font-size:12px;color:var(--muted)
+    }
+    .grid{
+      display:grid;
+      grid-template-columns: 1fr 1.2fr;
+      gap:14px;
+    }
+    @media (max-width: 980px){
+      .grid{grid-template-columns:1fr}
+    }
+    .card{
+      border:1px solid var(--line);
+      border-radius:14px;
+      background:var(--card);
+      box-shadow: 0 1px 0 rgba(17,24,39,.03);
+      padding:14px;
+    }
+    .card h2{
+      font-size:14px;margin:0 0 10px 0;
+      display:flex;align-items:center;justify-content:space-between;gap:10px
+    }
+    .hint{color:var(--muted);font-size:12px;margin:0}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    @media (max-width: 560px){
+      .row{grid-template-columns:1fr}
+    }
+    label{display:block;font-size:12px;color:var(--muted);margin:10px 0 6px}
+    select{
+      width:100%;
+      padding:10px 12px;
+      border:1px solid var(--line);
+      border-radius:12px;
+      background:#fff;
+      font-size:14px;
+      outline:none;
+    }
+    select:focus{border-color:#c7cbd1;box-shadow:0 0 0 3px rgba(17,24,39,.06)}
+    .btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+    button{
+      border:1px solid var(--line);
+      background:var(--soft);
+      color:var(--text);
+      padding:9px 10px;
+      border-radius:12px;
+      font-size:13px;
+      cursor:pointer;
+    }
+    button:hover{background:#f3f4f6}
+    button.primary{
+      background:var(--text);color:#fff;border-color:var(--text);
+    }
+    button.primary:hover{opacity:.92}
+    .scoreBox{
+      display:grid;grid-template-columns: 1fr 1.1fr;gap:12px;align-items:stretch;
+    }
+    @media (max-width: 560px){
+      .scoreBox{grid-template-columns:1fr}
+    }
+    .bigScore{
+      border:1px solid var(--line);
+      background:linear-gradient(180deg,#fff, #fafafa);
+      border-radius:16px;
+      padding:14px;
+      display:flex;flex-direction:column;gap:8px;justify-content:center;
+      min-height:140px;
+    }
+    .bigScore .num{
+      font-size:54px;line-height:1;font-weight:800;letter-spacing:-1px;
+    }
+    .bigScore .cap{color:var(--muted);font-size:12px}
+    .badge{
+      display:inline-flex;align-items:center;gap:6px;
+      padding:6px 10px;border-radius:999px;font-size:12px;border:1px solid var(--line);
+      width:max-content;
+    }
+    .badge.ok{color:var(--ok);background:#ecfdf5;border-color:#bbf7d0}
+    .badge.warn{color:var(--warn);background:#fffbeb;border-color:#fde68a}
+    .why{
+      border:1px solid var(--line);
+      border-radius:16px;
+      padding:14px;
+      min-height:140px;
+      display:flex;flex-direction:column;gap:10px;
+    }
+    .why .lines{
+      margin:0;padding-left:18px;color:var(--text);font-size:13px;line-height:1.6
+    }
+    .why .lines li{margin:4px 0}
+    .warnLine{
+      display:flex;align-items:flex-start;gap:8px;
+      color:var(--warn);font-size:12px;line-height:1.5;
+      padding:8px 10px;border-radius:12px;background:#fffbeb;border:1px solid #fde68a;
+    }
+    .warnLine.hidden{display:none}
+    .bars{display:flex;flex-direction:column;gap:10px;margin-top:8px}
+    .barRow{display:flex;flex-direction:column;gap:6px}
+    .barTop{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12px;color:var(--muted)}
+    .meter{
+      width:100%;height:10px;border-radius:999px;background:#f3f4f6;border:1px solid var(--line);
+      overflow:hidden;
+    }
+    .fill{height:100%;width:0%}
+    .listHead{
+      display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+      margin-bottom:10px;
+    }
+    .table{
+      width:100%;border-collapse:separate;border-spacing:0;
+      overflow:hidden;border:1px solid var(--line);border-radius:14px;
+    }
+    .table th,.table td{
+      padding:10px 12px;font-size:13px;border-bottom:1px solid var(--line);vertical-align:top;
+    }
+    .table th{background:var(--soft);text-align:left;color:var(--muted);font-weight:600}
+    .table tr:last-child td{border-bottom:none}
+    .mini{
+      color:var(--muted);font-size:12px;line-height:1.45
+    }
+    .copyBox{
+      display:flex;gap:8px;align-items:center;flex-wrap:wrap
+    }
+    .toast{
+      position:fixed;right:16px;bottom:16px;
+      background:#111827;color:#fff;padding:10px 12px;border-radius:12px;
+      font-size:13px;opacity:0;transform:translateY(8px);
+      transition: all .18s ease;
+      pointer-events:none;
+    }
+    .toast.show{opacity:1;transform:translateY(0)}
+    .foot{
+      margin-top:12px;color:var(--muted);font-size:11px;line-height:1.5
+    }
+    .kpi{
+      margin-left:auto;
+      display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Demo3｜相性スコア診断（配置の根拠を透明化）</h1>
+      <div class="sub">
+        「なんとなく割当」→「スコアと理由で説明できる割当」へ。<br>
+        ※デモ用の架空データです（個人情報・顧客情報・契約・財務・機密は扱いません）。
+      </div>
+    </div>
+    <div class="kpi">
+      <span class="pill">導線：①選ぶ → ②結論（1秒） → ③根拠</span>
+      <span class="pill">出力：おすすめ上位5件 + 注意（⚠）</span>
+    </div>
+  </header>
+
+  <div class="grid">
+    <!-- Left: input -->
+    <section class="card">
+      <h2>
+        ① 選ぶ（入力不要で開始）
+        <span class="hint">プリセットで即体験</span>
+      </h2>
+
+      <div class="row">
+        <div>
+          <label for="empSel">社員（特性）</label>
+          <select id="empSel"></select>
+          <p class="mini" id="empMini"></p>
+        </div>
+
+        <div>
+          <label for="siteSel">現場（特性）</label>
+          <select id="siteSel"></select>
+          <p class="mini" id="siteMini"></p>
+        </div>
+      </div>
+
+      <div class="btns">
+        <button id="btnExample" class="primary">例：佐藤 × Aビル（95点狙い）</button>
+        <button id="btnBad">例：佐藤 × Bビル（⚠注意狙い）</button>
+        <button id="btnShuffle">例データを入れ替える</button>
+        <button id="btnReset">初期に戻す</button>
+      </div>
+
+      <div class="foot">
+        <b>デモの意図：</b>「精度」より「腹落ち」。<br>
+        スコアはデモ用ロジック（0〜100）で、実データ連携は“匂わせ”に留めています。
+      </div>
+    </section>
+
+    <!-- Right: result -->
+    <section class="card">
+      <h2>
+        ② 結論（1秒で伝える）
+        <span class="hint">相性スコア + 理由（3行）</span>
+      </h2>
+
+      <div class="scoreBox">
+        <div class="bigScore">
+          <div class="cap" id="pairTitle">—</div>
+          <div class="num" id="scoreNum">—</div>
+          <div class="badge ok" id="badge">—</div>
+        </div>
+
+        <div class="why">
+          <ul class="lines" id="reasonLines"></ul>
+          <div class="warnLine hidden" id="warnBox">
+            <div>⚠</div>
+            <div id="warnText"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bars">
+        <div class="barRow">
+          <div class="barTop"><span>技術適合</span><span id="techVal">—</span></div>
+          <div class="meter"><div class="fill" id="techFill"></div></div>
+        </div>
+        <div class="barRow">
+          <div class="barTop"><span>対人適合</span><span id="socialVal">—</span></div>
+          <div class="meter"><div class="fill" id="socialFill"></div></div>
+        </div>
+        <div class="barRow">
+          <div class="barTop"><span>ミスマッチ罰（減点）</span><span id="penVal">—</span></div>
+          <div class="meter"><div class="fill" id="penFill"></div></div>
+        </div>
+      </div>
+
+      <div class="btns" style="margin-top:12px">
+        <button id="btnCopy" class="primary">前提と結果をコピー（稟議・共有用）</button>
+      </div>
+      <div class="mini" id="copyHint">コピー内容：社員/現場/スコア/理由/注意（あれば）/内訳</div>
+    </section>
+  </div>
+
+  <!-- Bottom: recommendations -->
+  <section class="card" style="margin-top:14px">
+    <div class="listHead">
+      <div>
+        <h2 style="margin:0">③ おすすめ配置リスト（上位5件）</h2>
+        <div class="mini">「誰を、どこに」→おすすめ順 + 簡潔な根拠（内輪メモは出しません）</div>
+      </div>
+      <span class="pill" id="listPill">—</span>
+    </div>
+
+    <table class="table">
+      <thead>
+        <tr>
+          <th style="width:72px">順位</th>
+          <th>おすすめ配置</th>
+          <th style="width:120px">スコア</th>
+          <th>理由（要点）</th>
+          <th style="width:90px">注意</th>
+        </tr>
+      </thead>
+      <tbody id="rankBody"></tbody>
+    </table>
+  </section>
+</div>
+
+<div class="toast" id="toast">コピーしました</div>
+
+<script>
+/**
+ * Demo3: 相性スコア診断（静的/1ファイル）
+ * - 個人情報/顧客情報/契約/財務/機密は扱わない（架空データ）
+ * - 腹落ち優先：スコア + 理由 + 注意 + 内訳の透明化
+ */
+
+// -------------------- Demo data (0〜10) --------------------
+const baseEmployees = [
+  { id:"sato", name:"佐藤（仮）", comm:3, tech:7, note:"黙々タイプ。会話が多い現場は負荷。"},
+  { id:"tanaka", name:"田中（仮）", comm:8, tech:6, note:"対人強い。調整役で力を発揮。"},
+  { id:"suzuki", name:"鈴木（仮）", comm:6, tech:9, note:"技術トップ。難易度高い現場に強い。"},
+  { id:"kobayashi", name:"小林（仮）", comm:4, tech:4, note:"育成枠。低難易度×会話少なめが安全。"},
+  { id:"yamada", name:"山田（仮）", comm:7, tech:3, note:"接客向き。技術難易度が高い現場は注意。"},
+];
+
+const baseSites = [
+  { id:"a_bldg", name:"Aビル（例）", peopleStress:2, techDifficulty:6, talkRequired:2, soloWork:9, note:"一人作業が多い。会話は最小。"},
+  { id:"b_bldg", name:"Bビル（例）", peopleStress:7, techDifficulty:5, talkRequired:9, soloWork:2, note:"管理人常駐。会話・調整が多い。"},
+  { id:"c_fac",  name:"C工場", peopleStress:4, techDifficulty:9, talkRequired:4, soloWork:6, note:"技術難易度高め。安全手順が多い。"},
+  { id:"d_shop", name:"D店舗", peopleStress:8, techDifficulty:3, talkRequired:8, soloWork:3, note:"お客様対応が頻発。臨機応変。"},
+  { id:"e_office",name:"Eオフィス", peopleStress:3, techDifficulty:4, talkRequired:5, soloWork:6, note:"ほどほど会話。安定運用向き。"},
+];
+
+// 作業用（シャッフルに対応）
+let employees = structuredClone(baseEmployees);
+let sites = structuredClone(baseSites);
+
+// -------------------- DOM --------------------
+const empSel = document.getElementById("empSel");
+const siteSel = document.getElementById("siteSel");
+const empMini = document.getElementById("empMini");
+const siteMini = document.getElementById("siteMini");
+
+const pairTitle = document.getElementById("pairTitle");
+const scoreNum = document.getElementById("scoreNum");
+const badge = document.getElementById("badge");
+const reasonLines = document.getElementById("reasonLines");
+const warnBox = document.getElementById("warnBox");
+const warnText = document.getElementById("warnText");
+
+const techVal = document.getElementById("techVal");
+const socialVal = document.getElementById("socialVal");
+const penVal = document.getElementById("penVal");
+const techFill = document.getElementById("techFill");
+const socialFill = document.getElementById("socialFill");
+const penFill = document.getElementById("penFill");
+
+const rankBody = document.getElementById("rankBody");
+const listPill = document.getElementById("listPill");
+
+const toast = document.getElementById("toast");
+
+// Buttons
+document.getElementById("btnExample").addEventListener("click", () => {
+  setSelection("sato", "a_bldg");
+  computeAndRender(true);
+});
+document.getElementById("btnBad").addEventListener("click", () => {
+  setSelection("sato", "b_bldg");
+  computeAndRender(true);
+});
+document.getElementById("btnShuffle").addEventListener("click", () => {
+  employees = shuffle(structuredClone(baseEmployees));
+  sites = shuffle(structuredClone(baseSites));
+  hydrateSelects();
+  // なるべく分かりやすい組み合わせを初期表示
+  setSelection("sato", "a_bldg", true);
+  computeAndRender(true);
+  showToast("例データを入れ替えました");
+});
+document.getElementById("btnReset").addEventListener("click", () => {
+  employees = structuredClone(baseEmployees);
+  sites = structuredClone(baseSites);
+  hydrateSelects();
+  setSelection("sato", "a_bldg", true);
+  computeAndRender(true);
+  showToast("初期状態に戻しました");
+});
+document.getElementById("btnCopy").addEventListener("click", async () => {
+  const emp = getSelectedEmp();
+  const site = getSelectedSite();
+  const out = getResult(emp, site);
+
+  const text =
+`【配置 相性診断（デモ）】
+社員：${emp.name}
+現場：${site.name}
+
+相性スコア：${out.score}/100
+理由：
+- ${out.reasons[0]}
+- ${out.reasons[1]}
+- ${out.reasons[2]}
+${out.warning ? `注意：⚠ ${out.warning}` : ""}
+
+内訳（透明化）：
+- 技術適合：${out.breakdown.techFit}/100
+- 対人適合：${out.breakdown.socialFit}/100
+- ミスマッチ罰：-${out.breakdown.penalty}点
+
+前提（デモ用パラメータ 0〜10）：
+社員：コミュ力=${emp.comm}, 技術力=${emp.tech}
+現場：対人ストレス=${site.peopleStress}, 技術難易度=${site.techDifficulty}, 会話必須度=${site.talkRequired}, 一人作業度=${site.soloWork}
+
+※架空データ。個人情報/顧客情報/契約/財務/機密は扱わない。`;
+
+  try{
+    await navigator.clipboard.writeText(text);
+    showToast("コピーしました");
+  }catch(e){
+    // フォールバック
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
+    showToast("コピーしました（互換）");
+  }
+});
+
+// Select change
+empSel.addEventListener("change", () => computeAndRender());
+siteSel.addEventListener("change", () => computeAndRender());
+
+// -------------------- Core scoring (demo logic) --------------------
+function clamp(n, min, max){ return Math.max(min, Math.min(max, n)); }
+function round(n){ return Math.round(n); }
+
+/**
+ * techFit / socialFit は「差が小さいほど高い」
+ * - techFit: |社員技術 - 現場難易度| が0なら100、差10なら0
+ * - socialFit: |社員コミュ - 現場会話必須| が0なら100、差10なら0
+ * penalty は「危険な組合せにだけ強めの減点」
+ */
+function getResult(emp, site){
+  const techFit = clamp(100 - Math.abs(emp.tech - site.techDifficulty) * 10, 0, 100);
+  const socialFit = clamp(100 - Math.abs(emp.comm - site.talkRequired) * 10, 0, 100);
+
+  let penalty = 0;
+  let warning = "";
+
+  // 典型NG：会話必須が高いのにコミュ低い
+  if(site.talkRequired >= 8 && emp.comm <= 3){
+    penalty += 25;
+    warning = "会話必須度が高い現場に対し、コミュ力が低め。クレーム/手戻りのリスク。";
+  }
+  // 技術難易度が高いのに技術が低い
+  if(site.techDifficulty >= 8 && emp.tech <= 4){
+    penalty += 20;
+    warning = warning || "技術難易度が高い現場に対し、技術力が不足気味。安全/品質のリスク。";
+  }
+  // 一人作業度が高いのにコミュが極端に高い（調整役の強みが活きにくい）
+  if(site.soloWork >= 8 && emp.comm >= 9){
+    penalty += 10;
+  }
+
+  // ベーススコア（腹落ち優先の重み）
+  const base = (techFit * 0.55) + (socialFit * 0.45);
+  let score = clamp(round(base - penalty), 0, 100);
+
+  // 理由（3行・テンプレ）
+  const reasons = buildReasons(emp, site, techFit, socialFit, penalty);
+
+  // バッジ
+  const label = score >= 80 ? "おすすめ（根拠あり）"
+              : score >= 60 ? "条件付き（要フォロー）"
+              : "注意（配置見直し）";
+
+  return {
+    score,
+    label,
+    reasons,
+    warning,
+    breakdown: { techFit: round(techFit), socialFit: round(socialFit), penalty: round(penalty) }
+  };
+}
+
+function buildReasons(emp, site, techFit, socialFit, penalty){
+  const lines = [];
+
+  // 技術理由
+  if(emp.tech >= site.techDifficulty){
+    lines.push(`技術力（${emp.tech}）が難易度（${site.techDifficulty}）を上回り、手戻りが出にくい。`);
+  }else{
+    lines.push(`技術難易度（${site.techDifficulty}）に対し技術力（${emp.tech}）が不足気味で、フォローが必要。`);
+  }
+
+  // 対人理由
+  if(site.talkRequired <= 3){
+    lines.push(`会話必須度が低く（${site.talkRequired}）、一人作業で進めやすい。`);
+  }else if(emp.comm >= site.talkRequired){
+    lines.push(`会話必須度（${site.talkRequired}）に対してコミュ力（${emp.comm}）が十分で、調整が回る。`);
+  }else{
+    lines.push(`会話必須度（${site.talkRequired}）に対してコミュ力（${emp.comm}）が不足し、対人ストレスが増えやすい。`);
+  }
+
+  // 減点理由（透明化）
+  if(penalty > 0){
+    lines.push(`ミスマッチ罰（-${penalty}点）：危険条件に該当するため、事前対策が必要。`);
+  }else{
+    lines.push(`ミスマッチ罰なし：危険条件に該当せず、標準運用で回しやすい。`);
+  }
+
+  // 3行固定
+  return lines.slice(0,3);
+}
+
+// -------------------- Rendering --------------------
+function hydrateSelects(){
+  empSel.innerHTML = "";
+  siteSel.innerHTML = "";
+
+  for(const e of employees){
+    const opt = document.createElement("option");
+    opt.value = e.id;
+    opt.textContent = e.name;
+    empSel.appendChild(opt);
+  }
+  for(const s of sites){
+    const opt = document.createElement("option");
+    opt.value = s.id;
+    opt.textContent = s.name;
+    siteSel.appendChild(opt);
+  }
+}
+
+function setSelection(empId, siteId, silent=false){
+  const empIndex = employees.findIndex(x=>x.id===empId);
+  const siteIndex = sites.findIndex(x=>x.id===siteId);
+
+  if(empIndex >= 0) empSel.selectedIndex = empIndex;
+  if(siteIndex >= 0) siteSel.selectedIndex = siteIndex;
+
+  if(!silent){
+    empSel.dispatchEvent(new Event("change"));
+    siteSel.dispatchEvent(new Event("change"));
+  }
+}
+
+function getSelectedEmp(){
+  return employees.find(x=>x.id===empSel.value) || employees[0];
+}
+function getSelectedSite(){
+  return sites.find(x=>x.id===siteSel.value) || sites[0];
+}
+
+function computeAndRender(forceToast=false){
+  const emp = getSelectedEmp();
+  const site = getSelectedSite();
+  const out = getResult(emp, site);
+
+  // Left mini descriptions
+  empMini.textContent = `コミュ力 ${emp.comm}/10 ・ 技術力 ${emp.tech}/10 ｜ ${emp.note}`;
+  siteMini.textContent = `対人ストレス ${site.peopleStress}/10 ・ 技術難易度 ${site.techDifficulty}/10 ・ 会話必須度 ${site.talkRequired}/10 ｜ ${site.note}`;
+
+  // Title
+  pairTitle.textContent = `${emp.name} × ${site.name}`;
+  scoreNum.textContent = String(out.score);
+
+  // Badge
+  badge.textContent = out.label;
+  badge.classList.remove("ok","warn");
+  if(out.score >= 80){
+    badge.classList.add("ok");
+  }else{
+    badge.classList.add("warn");
+  }
+
+  // Reasons
+  reasonLines.innerHTML = "";
+  out.reasons.forEach(r=>{
+    const li = document.createElement("li");
+    li.textContent = r;
+    reasonLines.appendChild(li);
+  });
+
+  // Warning
+  if(out.warning){
+    warnBox.classList.remove("hidden");
+    warnText.textContent = out.warning;
+  }else{
+    warnBox.classList.add("hidden");
+    warnText.textContent = "";
+  }
+
+  // Breakdown bars
+  techVal.textContent = `${out.breakdown.techFit}/100`;
+  socialVal.textContent = `${out.breakdown.socialFit}/100`;
+  penVal.textContent = `-${out.breakdown.penalty}点`;
+
+  setFill(techFill, out.breakdown.techFit);
+  setFill(socialFill, out.breakdown.socialFit);
+
+  // penalty meter: 0〜40くらいを想定して可視化（大きいほど赤…は色指定を避けるので幅だけ）
+  const penPct = clamp((out.breakdown.penalty / 40) * 100, 0, 100);
+  setFill(penFill, penPct);
+
+  // Ranking list (top 5 for selected emp)
+  renderRankingForEmp(emp);
+
+  if(forceToast){
+    showToast(`表示：${emp.name} × ${site.name}`);
+  }
+}
+
+function setFill(el, pct){
+  el.style.width = `${pct}%`;
+  // 色指定は避ける（要件上、見やすさ優先で無彩色のまま）
+  el.style.background = "#111827";
+}
+
+function renderRankingForEmp(emp){
+  const scored = sites.map(site=>{
+    const out = getResult(emp, site);
+    return { site, out };
+  }).sort((a,b)=> b.out.score - a.out.score);
+
+  const top5 = scored.slice(0,5);
+  listPill.textContent = `対象：${emp.name}（上位${top5.length}件）`;
+
+  rankBody.innerHTML = "";
+  top5.forEach((x, idx)=>{
+    const tr = document.createElement("tr");
+
+    const tdRank = document.createElement("td");
+    tdRank.textContent = `${idx+1}`;
+    tr.appendChild(tdRank);
+
+    const tdPair = document.createElement("td");
+    tdPair.innerHTML = `<b>${emp.name}</b> → ${x.site.name}<div class="mini">（会話必須:${x.site.talkRequired}/10・難易度:${x.site.techDifficulty}/10）</div>`;
+    tr.appendChild(tdPair);
+
+    const tdScore = document.createElement("td");
+    tdScore.innerHTML = `<b>${x.out.score}</b>/100`;
+    tr.appendChild(tdScore);
+
+    const tdWhy = document.createElement("td");
+    tdWhy.innerHTML = `<div class="mini">${escapeHtml(x.out.reasons.join(" / "))}</div>`;
+    tr.appendChild(tdWhy);
+
+    const tdWarn = document.createElement("td");
+    tdWarn.innerHTML = x.out.warning ? `<span title="${escapeHtml(x.out.warning)}">⚠</span>` : `—`;
+    tr.appendChild(tdWarn);
+
+    rankBody.appendChild(tr);
+  });
+}
+
+// -------------------- Utils --------------------
+function shuffle(arr){
+  for(let i=arr.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [arr[i],arr[j]] = [arr[j],arr[i]];
+  }
+  return arr;
+}
+
+function showToast(msg){
+  toast.textContent = msg || "完了";
+  toast.classList.add("show");
+  setTimeout(()=> toast.classList.remove("show"), 1100);
+}
+
+function escapeHtml(str){
+  return String(str)
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
+}
+
+// -------------------- Init --------------------
+hydrateSelects();
+// 初期：佐藤 × Aビル（「95点」の腹落ちを最短で見せる）
+setSelection("sato", "a_bldg", true);
+computeAndRender();
+</script>
+</body>
+</html>
